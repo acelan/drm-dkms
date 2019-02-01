@@ -1,0 +1,172 @@
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+index 083bd81..ae1db15 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+@@ -158,7 +158,7 @@ static int set_queue_properties_from_user(struct queue_properties *q_properties,
+ 	}
+ 
+ 	if ((args->ring_base_address) &&
+-		(!access_ok((const void __user *) args->ring_base_address,
++		(!access_ok(VERIFY_READ, (const void __user *) args->ring_base_address,
+ 			sizeof(uint64_t)))) {
+ 		pr_err("Can't access ring base address\n");
+ 		return -EFAULT;
+@@ -169,27 +169,27 @@ static int set_queue_properties_from_user(struct queue_properties *q_properties,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (!access_ok((const void __user *) args->read_pointer_address,
++	if (!access_ok(VERIFY_READ, (const void __user *) args->read_pointer_address,
+ 			sizeof(uint32_t))) {
+ 		pr_err("Can't access read pointer\n");
+ 		return -EFAULT;
+ 	}
+ 
+-	if (!access_ok((const void __user *) args->write_pointer_address,
++	if (!access_ok(VERIFY_READ, (const void __user *) args->write_pointer_address,
+ 			sizeof(uint32_t))) {
+ 		pr_err("Can't access write pointer\n");
+ 		return -EFAULT;
+ 	}
+ 
+ 	if (args->eop_buffer_address &&
+-		!access_ok((const void __user *) args->eop_buffer_address,
++		!access_ok(VERIFY_READ, (const void __user *) args->eop_buffer_address,
+ 			sizeof(uint32_t))) {
+ 		pr_debug("Can't access eop buffer");
+ 		return -EFAULT;
+ 	}
+ 
+ 	if (args->ctx_save_restore_address &&
+-		!access_ok((const void __user *) args->ctx_save_restore_address,
++		!access_ok(VERIFY_READ, (const void __user *) args->ctx_save_restore_address,
+ 			sizeof(uint32_t))) {
+ 		pr_debug("Can't access ctx save restore buffer");
+ 		return -EFAULT;
+@@ -360,7 +360,7 @@ static int kfd_ioctl_update_queue(struct file *filp, struct kfd_process *p,
+ 	}
+ 
+ 	if ((args->ring_base_address) &&
+-		(!access_ok((const void __user *) args->ring_base_address,
++		(!access_ok(VERIFY_READ, (const void __user *) args->ring_base_address,
+ 			sizeof(uint64_t)))) {
+ 		pr_err("Can't access ring base address\n");
+ 		return -EFAULT;
+diff --git a/drivers/gpu/drm/drm_file.c b/drivers/gpu/drm/drm_file.c
+index 46f48f2..df21661 100644
+--- a/drivers/gpu/drm/drm_file.c
++++ b/drivers/gpu/drm/drm_file.c
+@@ -525,7 +525,7 @@ ssize_t drm_read(struct file *filp, char __user *buffer,
+ 	struct drm_device *dev = file_priv->minor->dev;
+ 	ssize_t ret;
+ 
+-	if (!access_ok(buffer, count))
++	if (!access_ok(VERIFY_READ, buffer, count))
+ 		return -EFAULT;
+ 
+ 	ret = mutex_lock_interruptible(&file_priv->event_read_lock);
+diff --git a/drivers/gpu/drm/i915/i915_gem.c b/drivers/gpu/drm/i915/i915_gem.c
+index 216f52b..fc64fc7 100644
+--- a/drivers/gpu/drm/i915/i915_gem.c
++++ b/drivers/gpu/drm/i915/i915_gem.c
+@@ -1282,7 +1282,7 @@ i915_gem_pread_ioctl(struct drm_device *dev, void *data,
+ 	if (args->size == 0)
+ 		return 0;
+ 
+-	if (!access_ok(u64_to_user_ptr(args->data_ptr),
++	if (!access_ok(VERIFY_READ, u64_to_user_ptr(args->data_ptr),
+ 		       args->size))
+ 		return -EFAULT;
+ 
+@@ -1608,7 +1608,7 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
+ 	if (args->size == 0)
+ 		return 0;
+ 
+-	if (!access_ok(u64_to_user_ptr(args->data_ptr), args->size))
++	if (!access_ok(VERIFY_READ, u64_to_user_ptr(args->data_ptr), args->size))
+ 		return -EFAULT;
+ 
+ 	obj = i915_gem_object_lookup(file, args->handle);
+diff --git a/drivers/gpu/drm/i915/i915_gem_execbuffer.c b/drivers/gpu/drm/i915/i915_gem_execbuffer.c
+index 485b259..35c95f8 100644
+--- a/drivers/gpu/drm/i915/i915_gem_execbuffer.c
++++ b/drivers/gpu/drm/i915/i915_gem_execbuffer.c
+@@ -1447,7 +1447,7 @@ static int eb_relocate_vma(struct i915_execbuffer *eb, struct i915_vma *vma)
+ 	 * to read. However, if the array is not writable the user loses
+ 	 * the updated relocation values.
+ 	 */
+-	if (unlikely(!access_ok(urelocs, remain*sizeof(*urelocs))))
++	if (unlikely(!access_ok(VERIFY_READ, urelocs, remain*sizeof(*urelocs))))
+ 		return -EFAULT;
+ 
+ 	do {
+@@ -1554,7 +1554,7 @@ static int check_relocations(const struct drm_i915_gem_exec_object2 *entry)
+ 
+ 	addr = u64_to_user_ptr(entry->relocs_ptr);
+ 	size *= sizeof(struct drm_i915_gem_relocation_entry);
+-	if (!access_ok(addr, size))
++	if (!access_ok(VERIFY_READ, addr, size))
+ 		return -EFAULT;
+ 
+ 	end = addr + size;
+@@ -2093,7 +2093,7 @@ get_fence_array(struct drm_i915_gem_execbuffer2 *args,
+ 		return ERR_PTR(-EINVAL);
+ 
+ 	user = u64_to_user_ptr(args->cliprects_ptr);
+-	if (!access_ok(user, nfences * sizeof(*user)))
++	if (!access_ok(VERIFY_READ, user, nfences * sizeof(*user)))
+ 		return ERR_PTR(-EFAULT);
+ 
+ 	fences = kvmalloc_array(nfences, sizeof(*fences),
+diff --git a/drivers/gpu/drm/i915/i915_gem_userptr.c b/drivers/gpu/drm/i915/i915_gem_userptr.c
+index 9558582..620fb73 100644
+--- a/drivers/gpu/drm/i915/i915_gem_userptr.c
++++ b/drivers/gpu/drm/i915/i915_gem_userptr.c
+@@ -789,7 +789,7 @@ i915_gem_userptr_ioctl(struct drm_device *dev,
+ 	if (offset_in_page(args->user_ptr | args->user_size))
+ 		return -EINVAL;
+ 
+-	if (!access_ok((char __user *)(unsigned long)args->user_ptr, args->user_size))
++	if (!access_ok(VERIFY_READ, (char __user *)(unsigned long)args->user_ptr, args->user_size))
+ 		return -EFAULT;
+ 
+ 	if (args->flags & I915_USERPTR_READ_ONLY) {
+diff --git a/drivers/gpu/drm/i915/i915_ioc32.c b/drivers/gpu/drm/i915/i915_ioc32.c
+index e869daf..0413c83 100644
+--- a/drivers/gpu/drm/i915/i915_ioc32.c
++++ b/drivers/gpu/drm/i915/i915_ioc32.c
+@@ -52,7 +52,7 @@ static int compat_i915_getparam(struct file *file, unsigned int cmd,
+ 		return -EFAULT;
+ 
+ 	request = compat_alloc_user_space(sizeof(*request));
+-	if (!access_ok(request, sizeof(*request)) ||
++	if (!access_ok(VERIFY_READ, request, sizeof(*request)) ||
+ 	    __put_user(req32.param, &request->param) ||
+ 	    __put_user((void __user *)(unsigned long)req32.value,
+ 		       &request->value))
+diff --git a/drivers/gpu/drm/i915/i915_perf.c b/drivers/gpu/drm/i915/i915_perf.c
+index 2b2eb57..9b6d995 100644
+--- a/drivers/gpu/drm/i915/i915_perf.c
++++ b/drivers/gpu/drm/i915/i915_perf.c
+@@ -3052,7 +3052,7 @@ static struct i915_oa_reg *alloc_oa_regs(struct drm_i915_private *dev_priv,
+ 	if (!n_regs)
+ 		return NULL;
+ 
+-	if (!access_ok(regs, n_regs * sizeof(u32) * 2))
++	if (!access_ok(VERIFY_READ, regs, n_regs * sizeof(u32) * 2))
+ 		return ERR_PTR(-EFAULT);
+ 
+ 	/* No is_valid function means we're not allowing any register to be programmed. */
+diff --git a/drivers/gpu/drm/i915/i915_query.c b/drivers/gpu/drm/i915/i915_query.c
+index fe56465..a497abe 100644
+--- a/drivers/gpu/drm/i915/i915_query.c
++++ b/drivers/gpu/drm/i915/i915_query.c
+@@ -46,7 +46,7 @@ static int query_topology_info(struct drm_i915_private *dev_priv,
+ 	if (topo.flags != 0)
+ 		return -EINVAL;
+ 
+-	if (!access_ok(u64_to_user_ptr(query_item->data_ptr),
++	if (!access_ok(VERIFY_READ, u64_to_user_ptr(query_item->data_ptr),
+ 		       total_length))
+ 		return -EFAULT;
+ 
