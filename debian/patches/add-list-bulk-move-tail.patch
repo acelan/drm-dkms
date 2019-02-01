@@ -1,0 +1,25 @@
+diff --git a/drivers/gpu/drm/ttm/ttm_bo.c b/drivers/gpu/drm/ttm/ttm_bo.c
+index 0ec0839..77f7434 100644
+--- a/drivers/gpu/drm/ttm/ttm_bo.c
++++ b/drivers/gpu/drm/ttm/ttm_bo.c
+@@ -58,6 +58,20 @@ static struct attribute ttm_bo_count = {
+ 	.mode = S_IRUGO
+ };
+ 
++static inline void list_bulk_move_tail(struct list_head *head,
++				      struct list_head *first,
++				      struct list_head *last)
++{
++	first->prev->next = last->next;
++	last->next->prev = first->prev;
++
++	head->prev->next = first;
++	first->prev = head->prev;
++
++	last->next = head;
++	head->prev = last;
++}
++
+ /* default destructor */
+ static void ttm_bo_default_destroy(struct ttm_buffer_object *bo)
+ {
