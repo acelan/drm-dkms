@@ -31,3 +31,4 @@ Revert-vm-fault-t-type.patch
 0001-Revert-drm-i915-Convert-to-BITS_PER_TYPE.patch
 add-list-bulk-move-tail.patch
 revert-reservation-object-reserve-shared.patch
+convert_vmf_to_vm.patch

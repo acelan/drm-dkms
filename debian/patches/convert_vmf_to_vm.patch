@@ -1,0 +1,17 @@
+diff --git a/drivers/gpu/drm/ttm/ttm_bo_vm.c b/drivers/gpu/drm/ttm/ttm_bo_vm.c
+index a1d977f..2f5cf8e 100644
+--- a/drivers/gpu/drm/ttm/ttm_bo_vm.c
++++ b/drivers/gpu/drm/ttm/ttm_bo_vm.c
+@@ -268,10 +268,10 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
+ 		}
+ 
+ 		if (vma->vm_flags & VM_MIXEDMAP)
+-			ret = vmf_insert_mixed(&cvma, address,
++			ret = vm_insert_mixed(&cvma, address,
+ 					__pfn_to_pfn_t(pfn, PFN_DEV));
+ 		else
+-			ret = vmf_insert_pfn(&cvma, address, pfn);
++			ret = vm_insert_pfn(&cvma, address, pfn);
+ 
+ 		/*
+ 		 * Somebody beat us to this PTE or prefaulting to
