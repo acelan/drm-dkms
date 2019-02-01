@@ -17,5 +17,10 @@ Revert-the-rest-of-drivers-annotate-poll-instances.patch
 add-filp-clone-open.diff
 # -> 4.18.12 builds
 
+# revert drm_fb_helper_remove_conflicting_pci_framebuffers
+0001-Revert-drm-amdgpu-use-simpler-remove_conflicting_pci.patch
+0002-Revert-drm-radeon-use-simpler-remove_conflicting_pci.patch
+0003-Revert-fbdev-add-remove_conflicting_pci_framebuffers.patch
+
 use-backport.diff
 amdgpu-use-bpo-reservation.diff
