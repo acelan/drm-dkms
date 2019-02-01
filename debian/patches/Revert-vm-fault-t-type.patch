@@ -1,0 +1,128 @@
+diff --git a/drivers/gpu/drm/drm_vm.c b/drivers/gpu/drm/drm_vm.c
+index c330104..2660543 100644
+--- a/drivers/gpu/drm/drm_vm.c
++++ b/drivers/gpu/drm/drm_vm.c
+@@ -100,7 +100,7 @@ static pgprot_t drm_dma_prot(uint32_t map_type, struct vm_area_struct *vma)
+  * map, get the page, increment the use count and return it.
+  */
+ #if IS_ENABLED(CONFIG_AGP)
+-static vm_fault_t drm_vm_fault(struct vm_fault *vmf)
++static int drm_vm_fault(struct vm_fault *vmf)
+ {
+ 	struct vm_area_struct *vma = vmf->vma;
+ 	struct drm_file *priv = vma->vm_file->private_data;
+@@ -173,7 +173,7 @@ vm_fault_error:
+ 	return VM_FAULT_SIGBUS;	/* Disallow mremap */
+ }
+ #else
+-static vm_fault_t drm_vm_fault(struct vm_fault *vmf)
++static int drm_vm_fault(struct vm_fault *vmf)
+ {
+ 	return VM_FAULT_SIGBUS;
+ }
+@@ -189,7 +189,7 @@ static vm_fault_t drm_vm_fault(struct vm_fault *vmf)
+  * Get the mapping, find the real physical page to map, get the page, and
+  * return it.
+  */
+-static vm_fault_t drm_vm_shm_fault(struct vm_fault *vmf)
++static int drm_vm_shm_fault(struct vm_fault *vmf)
+ {
+ 	struct vm_area_struct *vma = vmf->vma;
+ 	struct drm_local_map *map = vma->vm_private_data;
+@@ -291,7 +291,7 @@ static void drm_vm_shm_close(struct vm_area_struct *vma)
+  *
+  * Determine the page number from the page offset and get it from drm_device_dma::pagelist.
+  */
+-static vm_fault_t drm_vm_dma_fault(struct vm_fault *vmf)
++static int drm_vm_dma_fault(struct vm_fault *vmf)
+ {
+ 	struct vm_area_struct *vma = vmf->vma;
+ 	struct drm_file *priv = vma->vm_file->private_data;
+@@ -326,7 +326,7 @@ static vm_fault_t drm_vm_dma_fault(struct vm_fault *vmf)
+  *
+  * Determine the map offset from the page offset and get it from drm_sg_mem::pagelist.
+  */
+-static vm_fault_t drm_vm_sg_fault(struct vm_fault *vmf)
++static int drm_vm_sg_fault(struct vm_fault *vmf)
+ {
+ 	struct vm_area_struct *vma = vmf->vma;
+ 	struct drm_local_map *map = vma->vm_private_data;
+diff --git a/drivers/gpu/drm/i915/i915_drv.h b/drivers/gpu/drm/i915/i915_drv.h
+index b1c3196..bc9458a 100644
+--- a/drivers/gpu/drm/i915/i915_drv.h
++++ b/drivers/gpu/drm/i915/i915_drv.h
+@@ -3058,7 +3058,7 @@ int i915_gem_wait_for_idle(struct drm_i915_private *dev_priv,
+ int __must_check i915_gem_suspend(struct drm_i915_private *dev_priv);
+ void i915_gem_suspend_late(struct drm_i915_private *dev_priv);
+ void i915_gem_resume(struct drm_i915_private *dev_priv);
+-vm_fault_t i915_gem_fault(struct vm_fault *vmf);
++int i915_gem_fault(struct vm_fault *vmf);
+ int i915_gem_object_wait(struct drm_i915_gem_object *obj,
+ 			 unsigned int flags,
+ 			 long timeout,
+diff --git a/drivers/gpu/drm/i915/i915_gem.c b/drivers/gpu/drm/i915/i915_gem.c
+index 216f52b..a7db6e3 100644
+--- a/drivers/gpu/drm/i915/i915_gem.c
++++ b/drivers/gpu/drm/i915/i915_gem.c
+@@ -2000,7 +2000,7 @@ compute_partial_view(const struct drm_i915_gem_object *obj,
+  * The current feature set supported by i915_gem_fault() and thus GTT mmaps
+  * is exposed via I915_PARAM_MMAP_GTT_VERSION (see i915_gem_mmap_gtt_version).
+  */
+-vm_fault_t i915_gem_fault(struct vm_fault *vmf)
++int i915_gem_fault(struct vm_fault *vmf)
+ {
+ #define MIN_CHUNK_PAGES (SZ_1M >> PAGE_SHIFT)
+ 	struct vm_area_struct *area = vmf->vma;
+diff --git a/drivers/gpu/drm/radeon/radeon_ttm.c b/drivers/gpu/drm/radeon/radeon_ttm.c
+index 9920a6f..20e5fb3 100644
+--- a/drivers/gpu/drm/radeon/radeon_ttm.c
++++ b/drivers/gpu/drm/radeon/radeon_ttm.c
+@@ -882,11 +882,11 @@ void radeon_ttm_set_active_vram_size(struct radeon_device *rdev, u64 size)
+ static struct vm_operations_struct radeon_ttm_vm_ops;
+ static const struct vm_operations_struct *ttm_vm_ops = NULL;
+ 
+-static vm_fault_t radeon_ttm_fault(struct vm_fault *vmf)
++static int radeon_ttm_fault(struct vm_fault *vmf)
+ {
+ 	struct ttm_buffer_object *bo;
+ 	struct radeon_device *rdev;
+-	vm_fault_t ret;
++	int ret;
+ 
+ 	bo = (struct ttm_buffer_object *)vmf->vma->vm_private_data;
+ 	if (bo == NULL) {
+diff --git a/drivers/gpu/drm/ttm/ttm_bo_vm.c b/drivers/gpu/drm/ttm/ttm_bo_vm.c
+index a1d977f..69193bf 100644
+--- a/drivers/gpu/drm/ttm/ttm_bo_vm.c
++++ b/drivers/gpu/drm/ttm/ttm_bo_vm.c
+@@ -44,10 +44,10 @@
+ 
+ #define TTM_BO_VM_NUM_PREFAULT 16
+ 
+-static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
++static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
+ 				struct vm_fault *vmf)
+ {
+-	vm_fault_t ret = 0;
++	int ret = 0;
+ 	int err = 0;
+ 
+ 	if (likely(!bo->moving))
+@@ -106,7 +106,7 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
+ 		+ page_offset;
+ }
+ 
+-static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
++static int ttm_bo_vm_fault(struct vm_fault *vmf)
+ {
+ 	struct vm_area_struct *vma = vmf->vma;
+ 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
+@@ -119,7 +119,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
+ 	struct page *page;
+ 	int err;
+ 	int i;
+-	vm_fault_t ret = VM_FAULT_NOPAGE;
++	int ret = VM_FAULT_NOPAGE;
+ 	unsigned long address = vmf->address;
+ 	struct ttm_mem_type_manager *man =
+ 		&bdev->man[bo->mem.mem_type];
