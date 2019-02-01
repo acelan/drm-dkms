@@ -1,0 +1,264 @@
+From 30b342c148da0acbf4823b600064695cc3511c38 Mon Sep 17 00:00:00 2001
+From: AceLan Kao <acelan.kao@canonical.com>
+Date: Fri, 1 Feb 2019 09:38:17 +0800
+Subject: [PATCH 2/2] Revert "drm/radeon: use pcie functions for link width"
+
+This reverts commit 5f152a572c10cae4b08c2c5f2932a51684f454ba.
+---
+ drivers/gpu/drm/radeon/ci_dpm.c   | 20 +++++---------------
+ drivers/gpu/drm/radeon/cik.c      | 22 ++++++++++------------
+ drivers/gpu/drm/radeon/r600_dpm.c |  4 ++--
+ drivers/gpu/drm/radeon/radeon.h   |  4 ----
+ drivers/gpu/drm/radeon/si.c       | 22 ++++++++++------------
+ drivers/gpu/drm/radeon/si_dpm.c   | 20 +++++---------------
+ 6 files changed, 32 insertions(+), 60 deletions(-)
+
+diff --git a/drivers/gpu/drm/radeon/ci_dpm.c b/drivers/gpu/drm/radeon/ci_dpm.c
+index d587779a80b4..b9302c918271 100644
+--- a/drivers/gpu/drm/radeon/ci_dpm.c
++++ b/drivers/gpu/drm/radeon/ci_dpm.c
+@@ -5676,29 +5676,19 @@ int ci_dpm_init(struct radeon_device *rdev)
+ 	u16 data_offset, size;
+ 	u8 frev, crev;
+ 	struct ci_power_info *pi;
+-	enum pci_bus_speed speed_cap;
+-	struct pci_dev *root = rdev->pdev->bus->self;
+ 	int ret;
++	u32 mask;
+ 
+ 	pi = kzalloc(sizeof(struct ci_power_info), GFP_KERNEL);
+ 	if (pi == NULL)
+ 		return -ENOMEM;
+ 	rdev->pm.dpm.priv = pi;
+ 
+-	speed_cap = pcie_get_speed_cap(root);
+-	if (speed_cap == PCI_SPEED_UNKNOWN) {
++	ret = drm_pcie_get_speed_cap_mask(rdev->ddev, &mask);
++	if (ret)
+ 		pi->sys_pcie_mask = 0;
+-	} else {
+-		if (speed_cap == PCIE_SPEED_8_0GT)
+-			pi->sys_pcie_mask = RADEON_PCIE_SPEED_25 |
+-				RADEON_PCIE_SPEED_50 |
+-				RADEON_PCIE_SPEED_80;
+-		else if (speed_cap == PCIE_SPEED_5_0GT)
+-			pi->sys_pcie_mask = RADEON_PCIE_SPEED_25 |
+-				RADEON_PCIE_SPEED_50;
+-		else
+-			pi->sys_pcie_mask = RADEON_PCIE_SPEED_25;
+-	}
++	else
++		pi->sys_pcie_mask = mask;
+ 	pi->force_pcie_gen = RADEON_PCIE_GEN_INVALID;
+ 
+ 	pi->pcie_gen_performance.max = RADEON_PCIE_GEN1;
+diff --git a/drivers/gpu/drm/radeon/cik.c b/drivers/gpu/drm/radeon/cik.c
+index ab7b4e2ffcd2..c1b4d4fbcf3a 100644
+--- a/drivers/gpu/drm/radeon/cik.c
++++ b/drivers/gpu/drm/radeon/cik.c
+@@ -9499,10 +9499,9 @@ int cik_set_vce_clocks(struct radeon_device *rdev, u32 evclk, u32 ecclk)
+ static void cik_pcie_gen3_enable(struct radeon_device *rdev)
+ {
+ 	struct pci_dev *root = rdev->pdev->bus->self;
+-	enum pci_bus_speed speed_cap;
+ 	int bridge_pos, gpu_pos;
+-	u32 speed_cntl, current_data_rate;
+-	int i;
++	u32 speed_cntl, mask, current_data_rate;
++	int ret, i;
+ 	u16 tmp16;
+ 
+ 	if (pci_is_root_bus(rdev->pdev->bus))
+@@ -9517,24 +9516,23 @@ static void cik_pcie_gen3_enable(struct radeon_device *rdev)
+ 	if (!(rdev->flags & RADEON_IS_PCIE))
+ 		return;
+ 
+-	speed_cap = pcie_get_speed_cap(root);
+-	if (speed_cap == PCI_SPEED_UNKNOWN)
++	ret = drm_pcie_get_speed_cap_mask(rdev->ddev, &mask);
++	if (ret != 0)
+ 		return;
+ 
+-	if ((speed_cap != PCIE_SPEED_8_0GT) &&
+-	    (speed_cap != PCIE_SPEED_5_0GT))
++	if (!(mask & (DRM_PCIE_SPEED_50 | DRM_PCIE_SPEED_80)))
+ 		return;
+ 
+ 	speed_cntl = RREG32_PCIE_PORT(PCIE_LC_SPEED_CNTL);
+ 	current_data_rate = (speed_cntl & LC_CURRENT_DATA_RATE_MASK) >>
+ 		LC_CURRENT_DATA_RATE_SHIFT;
+-	if (speed_cap == PCIE_SPEED_8_0GT) {
++	if (mask & DRM_PCIE_SPEED_80) {
+ 		if (current_data_rate == 2) {
+ 			DRM_INFO("PCIE gen 3 link speeds already enabled\n");
+ 			return;
+ 		}
+ 		DRM_INFO("enabling PCIE gen 3 link speeds, disable with radeon.pcie_gen2=0\n");
+-	} else if (speed_cap == PCIE_SPEED_5_0GT) {
++	} else if (mask & DRM_PCIE_SPEED_50) {
+ 		if (current_data_rate == 1) {
+ 			DRM_INFO("PCIE gen 2 link speeds already enabled\n");
+ 			return;
+@@ -9550,7 +9548,7 @@ static void cik_pcie_gen3_enable(struct radeon_device *rdev)
+ 	if (!gpu_pos)
+ 		return;
+ 
+-	if (speed_cap == PCIE_SPEED_8_0GT) {
++	if (mask & DRM_PCIE_SPEED_80) {
+ 		/* re-try equalization if gen3 is not already enabled */
+ 		if (current_data_rate != 2) {
+ 			u16 bridge_cfg, gpu_cfg;
+@@ -9638,9 +9636,9 @@ static void cik_pcie_gen3_enable(struct radeon_device *rdev)
+ 
+ 	pci_read_config_word(rdev->pdev, gpu_pos + PCI_EXP_LNKCTL2, &tmp16);
+ 	tmp16 &= ~0xf;
+-	if (speed_cap == PCIE_SPEED_8_0GT)
++	if (mask & DRM_PCIE_SPEED_80)
+ 		tmp16 |= 3; /* gen3 */
+-	else if (speed_cap == PCIE_SPEED_5_0GT)
++	else if (mask & DRM_PCIE_SPEED_50)
+ 		tmp16 |= 2; /* gen2 */
+ 	else
+ 		tmp16 |= 1; /* gen1 */
+diff --git a/drivers/gpu/drm/radeon/r600_dpm.c b/drivers/gpu/drm/radeon/r600_dpm.c
+index 5e044c98fca2..73d4c5348116 100644
+--- a/drivers/gpu/drm/radeon/r600_dpm.c
++++ b/drivers/gpu/drm/radeon/r600_dpm.c
+@@ -1327,9 +1327,9 @@ enum radeon_pcie_gen r600_get_pcie_gen_support(struct radeon_device *rdev,
+ 	case RADEON_PCIE_GEN3:
+ 		return RADEON_PCIE_GEN3;
+ 	default:
+-		if ((sys_mask & RADEON_PCIE_SPEED_80) && (default_gen == RADEON_PCIE_GEN3))
++		if ((sys_mask & DRM_PCIE_SPEED_80) && (default_gen == RADEON_PCIE_GEN3))
+ 			return RADEON_PCIE_GEN3;
+-		else if ((sys_mask & RADEON_PCIE_SPEED_50) && (default_gen == RADEON_PCIE_GEN2))
++		else if ((sys_mask & DRM_PCIE_SPEED_50) && (default_gen == RADEON_PCIE_GEN2))
+ 			return RADEON_PCIE_GEN2;
+ 		else
+ 			return RADEON_PCIE_GEN1;
+diff --git a/drivers/gpu/drm/radeon/radeon.h b/drivers/gpu/drm/radeon/radeon.h
+index 32808e50be12..2fd181b6d3ce 100644
+--- a/drivers/gpu/drm/radeon/radeon.h
++++ b/drivers/gpu/drm/radeon/radeon.h
+@@ -1650,10 +1650,6 @@ struct radeon_pm {
+ 	struct radeon_dpm       dpm;
+ };
+ 
+-#define RADEON_PCIE_SPEED_25 1
+-#define RADEON_PCIE_SPEED_50 2
+-#define RADEON_PCIE_SPEED_80 4
+-
+ int radeon_pm_get_type_index(struct radeon_device *rdev,
+ 			     enum radeon_pm_state_type ps_type,
+ 			     int instance);
+diff --git a/drivers/gpu/drm/radeon/si.c b/drivers/gpu/drm/radeon/si.c
+index 841bc8bc333d..c28743443970 100644
+--- a/drivers/gpu/drm/radeon/si.c
++++ b/drivers/gpu/drm/radeon/si.c
+@@ -7082,10 +7082,9 @@ int si_set_uvd_clocks(struct radeon_device *rdev, u32 vclk, u32 dclk)
+ static void si_pcie_gen3_enable(struct radeon_device *rdev)
+ {
+ 	struct pci_dev *root = rdev->pdev->bus->self;
+-	enum pci_bus_speed speed_cap;
+ 	int bridge_pos, gpu_pos;
+-	u32 speed_cntl, current_data_rate;
+-	int i;
++	u32 speed_cntl, mask, current_data_rate;
++	int ret, i;
+ 	u16 tmp16;
+ 
+ 	if (pci_is_root_bus(rdev->pdev->bus))
+@@ -7100,24 +7099,23 @@ static void si_pcie_gen3_enable(struct radeon_device *rdev)
+ 	if (!(rdev->flags & RADEON_IS_PCIE))
+ 		return;
+ 
+-	speed_cap = pcie_get_speed_cap(root);
+-	if (speed_cap == PCI_SPEED_UNKNOWN)
++	ret = drm_pcie_get_speed_cap_mask(rdev->ddev, &mask);
++	if (ret != 0)
+ 		return;
+ 
+-	if ((speed_cap != PCIE_SPEED_8_0GT) &&
+-	    (speed_cap != PCIE_SPEED_5_0GT))
++	if (!(mask & (DRM_PCIE_SPEED_50 | DRM_PCIE_SPEED_80)))
+ 		return;
+ 
+ 	speed_cntl = RREG32_PCIE_PORT(PCIE_LC_SPEED_CNTL);
+ 	current_data_rate = (speed_cntl & LC_CURRENT_DATA_RATE_MASK) >>
+ 		LC_CURRENT_DATA_RATE_SHIFT;
+-	if (speed_cap == PCIE_SPEED_8_0GT) {
++	if (mask & DRM_PCIE_SPEED_80) {
+ 		if (current_data_rate == 2) {
+ 			DRM_INFO("PCIE gen 3 link speeds already enabled\n");
+ 			return;
+ 		}
+ 		DRM_INFO("enabling PCIE gen 3 link speeds, disable with radeon.pcie_gen2=0\n");
+-	} else if (speed_cap == PCIE_SPEED_5_0GT) {
++	} else if (mask & DRM_PCIE_SPEED_50) {
+ 		if (current_data_rate == 1) {
+ 			DRM_INFO("PCIE gen 2 link speeds already enabled\n");
+ 			return;
+@@ -7133,7 +7131,7 @@ static void si_pcie_gen3_enable(struct radeon_device *rdev)
+ 	if (!gpu_pos)
+ 		return;
+ 
+-	if (speed_cap == PCIE_SPEED_8_0GT) {
++	if (mask & DRM_PCIE_SPEED_80) {
+ 		/* re-try equalization if gen3 is not already enabled */
+ 		if (current_data_rate != 2) {
+ 			u16 bridge_cfg, gpu_cfg;
+@@ -7221,9 +7219,9 @@ static void si_pcie_gen3_enable(struct radeon_device *rdev)
+ 
+ 	pci_read_config_word(rdev->pdev, gpu_pos + PCI_EXP_LNKCTL2, &tmp16);
+ 	tmp16 &= ~0xf;
+-	if (speed_cap == PCIE_SPEED_8_0GT)
++	if (mask & DRM_PCIE_SPEED_80)
+ 		tmp16 |= 3; /* gen3 */
+-	else if (speed_cap == PCIE_SPEED_5_0GT)
++	else if (mask & DRM_PCIE_SPEED_50)
+ 		tmp16 |= 2; /* gen2 */
+ 	else
+ 		tmp16 |= 1; /* gen1 */
+diff --git a/drivers/gpu/drm/radeon/si_dpm.c b/drivers/gpu/drm/radeon/si_dpm.c
+index 8fb60b3af015..fea88078cf8e 100644
+--- a/drivers/gpu/drm/radeon/si_dpm.c
++++ b/drivers/gpu/drm/radeon/si_dpm.c
+@@ -6899,9 +6899,8 @@ int si_dpm_init(struct radeon_device *rdev)
+ 	struct ni_power_info *ni_pi;
+ 	struct si_power_info *si_pi;
+ 	struct atom_clock_dividers dividers;
+-	enum pci_bus_speed speed_cap;
+-	struct pci_dev *root = rdev->pdev->bus->self;
+ 	int ret;
++	u32 mask;
+ 
+ 	si_pi = kzalloc(sizeof(struct si_power_info), GFP_KERNEL);
+ 	if (si_pi == NULL)
+@@ -6911,20 +6910,11 @@ int si_dpm_init(struct radeon_device *rdev)
+ 	eg_pi = &ni_pi->eg;
+ 	pi = &eg_pi->rv7xx;
+ 
+-	speed_cap = pcie_get_speed_cap(root);
+-	if (speed_cap == PCI_SPEED_UNKNOWN) {
++	ret = drm_pcie_get_speed_cap_mask(rdev->ddev, &mask);
++	if (ret)
+ 		si_pi->sys_pcie_mask = 0;
+-	} else {
+-		if (speed_cap == PCIE_SPEED_8_0GT)
+-			si_pi->sys_pcie_mask = RADEON_PCIE_SPEED_25 |
+-				RADEON_PCIE_SPEED_50 |
+-				RADEON_PCIE_SPEED_80;
+-		else if (speed_cap == PCIE_SPEED_5_0GT)
+-			si_pi->sys_pcie_mask = RADEON_PCIE_SPEED_25 |
+-				RADEON_PCIE_SPEED_50;
+-		else
+-			si_pi->sys_pcie_mask = RADEON_PCIE_SPEED_25;
+-	}
++	else
++		si_pi->sys_pcie_mask = mask;
+ 	si_pi->force_pcie_gen = RADEON_PCIE_GEN_INVALID;
+ 	si_pi->boot_pcie_gen = si_get_current_pcie_speed(rdev);
+ 
+-- 
+2.17.1
+

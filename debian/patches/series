@@ -25,3 +25,6 @@ add-filp-clone-open.diff
 use-backport.diff
 amdgpu-use-bpo-reservation.diff
 Revert-vm-fault-t-type.patch
+0001-Revert-drm-amdgpu-use-pcie-functions-for-link-width-.patch
+0002-Revert-drm-radeon-use-pcie-functions-for-link-width.patch
+0001-Revert-drm-drop-drm_pcie_get_speed_cap_mask-and-drm_.patch
