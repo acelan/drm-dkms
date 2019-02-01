@@ -1,0 +1,98 @@
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index d2ea5ce..f79dcc8 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -3018,7 +3018,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 	if (r)
+ 		goto error_free_root;
+ 
+-	r = reservation_object_reserve_shared(root->tbo.resv, 1);
++	r = reservation_object_reserve_shared(root->tbo.resv);
+ 	if (r)
+ 		goto error_unreserve;
+ 
+diff --git a/drivers/gpu/drm/i915/i915_vma.c b/drivers/gpu/drm/i915/i915_vma.c
+index 5b4d78c..82652c3 100644
+--- a/drivers/gpu/drm/i915/i915_vma.c
++++ b/drivers/gpu/drm/i915/i915_vma.c
+@@ -892,7 +892,7 @@ static void export_fence(struct i915_vma *vma,
+ 	reservation_object_lock(resv, NULL);
+ 	if (flags & EXEC_OBJECT_WRITE)
+ 		reservation_object_add_excl_fence(resv, &rq->fence);
+-	else if (reservation_object_reserve_shared(resv, 1) == 0)
++	else if (reservation_object_reserve_shared(resv) == 0)
+ 		reservation_object_add_shared_fence(resv, &rq->fence);
+ 	reservation_object_unlock(resv);
+ }
+diff --git a/drivers/gpu/drm/nouveau/nouveau_fence.c b/drivers/gpu/drm/nouveau/nouveau_fence.c
+index d4964f3..99be61d 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_fence.c
++++ b/drivers/gpu/drm/nouveau/nouveau_fence.c
+@@ -341,7 +341,7 @@ nouveau_fence_sync(struct nouveau_bo *nvbo, struct nouveau_channel *chan, bool e
+ 	int ret = 0, i;
+ 
+ 	if (!exclusive) {
+-		ret = reservation_object_reserve_shared(resv, 1);
++		ret = reservation_object_reserve_shared(resv);
+ 
+ 		if (ret)
+ 			return ret;
+diff --git a/drivers/gpu/drm/radeon/radeon_vm.c b/drivers/gpu/drm/radeon/radeon_vm.c
+index 0d37421..7a444b8 100644
+--- a/drivers/gpu/drm/radeon/radeon_vm.c
++++ b/drivers/gpu/drm/radeon/radeon_vm.c
+@@ -831,7 +831,7 @@ static int radeon_vm_update_ptes(struct radeon_device *rdev,
+ 		int r;
+ 
+ 		radeon_sync_resv(rdev, &ib->sync, pt->tbo.resv, true);
+-		r = reservation_object_reserve_shared(pt->tbo.resv, 1);
++		r = reservation_object_reserve_shared(pt->tbo.resv);
+ 		if (r)
+ 			return r;
+ 
+diff --git a/drivers/gpu/drm/ttm/ttm_execbuf_util.c b/drivers/gpu/drm/ttm/ttm_execbuf_util.c
+index 9386034..62332a7 100644
+--- a/drivers/gpu/drm/ttm/ttm_execbuf_util.c
++++ b/drivers/gpu/drm/ttm/ttm_execbuf_util.c
+@@ -129,8 +129,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
+ 			if (!entry->num_shared)
+ 				continue;
+ 
+-			ret = reservation_object_reserve_shared(bo->resv,
+-								entry->num_shared);
++			ret = reservation_object_reserve_shared(bo->resv);
+ 			if (!ret)
+ 				continue;
+ 		}
+@@ -152,8 +151,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
+ 		}
+ 
+ 		if (!ret && entry->num_shared)
+-			ret = reservation_object_reserve_shared(bo->resv,
+-								entry->num_shared);
++			ret = reservation_object_reserve_shared(bo->resv);
+ 
+ 		if (unlikely(ret != 0)) {
+ 			if (ret == -EINTR)
+diff --git a/drivers/gpu/drm/ttm/ttm_bo.c b/drivers/gpu/drm/ttm/ttm_bo.c
+index 0ec0839..e3c3ff0 100644
+--- a/drivers/gpu/drm/ttm/ttm_bo.c
++++ b/drivers/gpu/drm/ttm/ttm_bo.c
+@@ -881,7 +895,7 @@ static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
+ 	if (fence) {
+ 		reservation_object_add_shared_fence(bo->resv, fence);
+ 
+-		ret = reservation_object_reserve_shared(bo->resv, 1);
++		ret = reservation_object_reserve_shared(bo->resv);
+ 		if (unlikely(ret))
+ 			return ret;
+ 
+@@ -986,7 +1000,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
+ 	bool has_erestartsys = false;
+ 	int i, ret;
+ 
+-	ret = reservation_object_reserve_shared(bo->resv, 1);
++	ret = reservation_object_reserve_shared(bo->resv);
+ 	if (unlikely(ret))
+ 		return ret;
+ 

@@ -30,3 +30,4 @@ Revert-vm-fault-t-type.patch
 0001-Revert-drm-drop-drm_pcie_get_speed_cap_mask-and-drm_.patch
 0001-Revert-drm-i915-Convert-to-BITS_PER_TYPE.patch
 add-list-bulk-move-tail.patch
+revert-reservation-object-reserve-shared.patch
