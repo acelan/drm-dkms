@@ -27,7 +27,7 @@
 
 #include <drm/drmP.h>
 
-enum drm_sched_priority amdgpu_to_sched_priority(int amdgpu_priority);
+enum amd_sched_priority amdgpu_to_sched_priority(int amdgpu_priority);
 int amdgpu_sched_ioctl(struct drm_device *dev, void *data,
 		       struct drm_file *filp);
 

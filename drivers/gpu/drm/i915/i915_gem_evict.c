@@ -46,7 +46,7 @@ static bool ggtt_is_idle(struct drm_i915_private *i915)
 	       return false;
 
        for_each_engine(engine, i915, id) {
-	       if (!intel_engine_has_kernel_context(engine))
+	       if (engine->last_retired_context != i915->kernel_context)
 		       return false;
        }
 
@@ -69,12 +69,10 @@ static int ggtt_flush(struct drm_i915_private *i915)
 
 	err = i915_gem_wait_for_idle(i915,
 				     I915_WAIT_INTERRUPTIBLE |
-				     I915_WAIT_LOCKED,
-				     MAX_SCHEDULE_TIMEOUT);
+				     I915_WAIT_LOCKED);
 	if (err)
 		return err;
 
-	GEM_BUG_ON(!ggtt_is_idle(i915));
 	return 0;
 }
 
@@ -169,7 +167,7 @@ i915_gem_evict_something(struct i915_address_space *vm,
 	 * retiring.
 	 */
 	if (!(flags & PIN_NONBLOCK))
-		i915_retire_requests(dev_priv);
+		i915_gem_retire_requests(dev_priv);
 	else
 		phases[1] = NULL;
 
@@ -218,7 +216,6 @@ search_again:
 		if (ret)
 			return ret;
 
-		cond_resched();
 		goto search_again;
 	}
 
@@ -294,7 +291,7 @@ int i915_gem_evict_for_node(struct i915_address_space *vm,
 	 * retiring.
 	 */
 	if (!(flags & PIN_NONBLOCK))
-		i915_retire_requests(vm->i915);
+		i915_gem_retire_requests(vm->i915);
 
 	check_color = vm->mm.color_adjust;
 	if (check_color) {

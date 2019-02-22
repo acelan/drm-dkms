@@ -31,10 +31,9 @@
 
 #include "dce110/dce110_hw_sequencer.h"
 
-#include "dce/dce_12_0_offset.h"
-#include "dce/dce_12_0_sh_mask.h"
-#include "soc15_hw_ip.h"
-#include "vega10_ip_offset.h"
+#include "vega10/DC/dce_12_0_offset.h"
+#include "vega10/DC/dce_12_0_sh_mask.h"
+#include "vega10/soc15ip.h"
 #include "reg_helper.h"
 
 #define CTX \
@@ -243,6 +242,8 @@ static void dce120_update_dchub(
 	dh_data->dchub_initialzied = true;
 	dh_data->dchub_info_valid = false;
 }
+
+
 
 void dce120_hw_sequencer_construct(struct dc *dc)
 {

@@ -24,7 +24,7 @@
  */
 
 #include "dm_services.h"
-#include "amdgpu.h"
+
 #include "atom.h"
 
 #include "include/bios_parser_interface.h"
@@ -35,16 +35,16 @@
 #include "bios_parser_types_internal.h"
 
 #define EXEC_BIOS_CMD_TABLE(command, params)\
-	(amdgpu_atom_execute_table(((struct amdgpu_device *)bp->base.ctx->driver_context)->mode_info.atom_context, \
+	(cgs_atom_exec_cmd_table(bp->base.ctx->cgs_device, \
 		GetIndexIntoMasterTable(COMMAND, command), \
-		(uint32_t *)&params) == 0)
+		&params) == 0)
 
 #define BIOS_CMD_TABLE_REVISION(command, frev, crev)\
-	amdgpu_atom_parse_cmd_header(((struct amdgpu_device *)bp->base.ctx->driver_context)->mode_info.atom_context, \
+	cgs_atom_get_cmd_table_revs(bp->base.ctx->cgs_device, \
 		GetIndexIntoMasterTable(COMMAND, command), &frev, &crev)
 
 #define BIOS_CMD_TABLE_PARA_REVISION(command)\
-	bios_cmd_table_para_revision(bp->base.ctx->driver_context, \
+	bios_cmd_table_para_revision(bp->base.ctx->cgs_device, \
 		GetIndexIntoMasterTable(COMMAND, command))
 
 static void init_dig_encoder_control(struct bios_parser *bp);
@@ -82,18 +82,16 @@ void dal_bios_parser_init_cmd_tbl(struct bios_parser *bp)
 	init_set_dce_clock(bp);
 }
 
-static uint32_t bios_cmd_table_para_revision(void *dev,
+static uint32_t bios_cmd_table_para_revision(void *cgs_device,
 					     uint32_t index)
 {
-	struct amdgpu_device *adev = dev;
 	uint8_t frev, crev;
 
-	if (amdgpu_atom_parse_cmd_header(adev->mode_info.atom_context,
+	if (cgs_atom_get_cmd_table_revs(cgs_device,
 					index,
-					&frev, &crev))
-		return crev;
-	else
+					&frev, &crev) != 0)
 		return 0;
+	return crev;
 }
 
 /*******************************************************************************
@@ -370,7 +368,7 @@ static void init_transmitter_control(struct bios_parser *bp)
 	uint8_t crev;
 
 	if (BIOS_CMD_TABLE_REVISION(UNIPHYTransmitterControl,
-			frev, crev) == false)
+			frev, crev) != 0)
 		BREAK_TO_DEBUGGER();
 	switch (crev) {
 	case 2:
@@ -389,7 +387,6 @@ static void init_transmitter_control(struct bios_parser *bp)
 		bp->cmd_tbl.transmitter_control = transmitter_control_v1_6;
 		break;
 	default:
-		dm_output_to_console("Don't have transmitter_control for v%d\n", crev);
 		bp->cmd_tbl.transmitter_control = NULL;
 		break;
 	}
@@ -808,24 +805,6 @@ static enum bp_result transmitter_control_v1_5(
 	 * (=1: 8bpp, =1.25: 10bpp, =1.5:12bpp, =2: 16bpp)
 	 * LVDS mode: usPixelClock = pixel clock
 	 */
-	if  (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A) {
-		switch (cntl->color_depth) {
-		case COLOR_DEPTH_101010:
-			params.usSymClock =
-				cpu_to_le16((le16_to_cpu(params.usSymClock) * 30) / 24);
-			break;
-		case COLOR_DEPTH_121212:
-			params.usSymClock =
-				cpu_to_le16((le16_to_cpu(params.usSymClock) * 36) / 24);
-			break;
-		case COLOR_DEPTH_161616:
-			params.usSymClock =
-				cpu_to_le16((le16_to_cpu(params.usSymClock) * 48) / 24);
-			break;
-		default:
-			break;
-		}
-	}
 
 	if (EXEC_BIOS_CMD_TABLE(UNIPHYTransmitterControl, params))
 		result = BP_RESULT_OK;
@@ -931,8 +910,6 @@ static void init_set_pixel_clock(struct bios_parser *bp)
 		bp->cmd_tbl.set_pixel_clock = set_pixel_clock_v7;
 		break;
 	default:
-		dm_output_to_console("Don't have set_pixel_clock for v%d\n",
-			 BIOS_CMD_TABLE_PARA_REVISION(SetPixelClock));
 		bp->cmd_tbl.set_pixel_clock = NULL;
 		break;
 	}
@@ -1250,8 +1227,6 @@ static void init_enable_spread_spectrum_on_ppll(struct bios_parser *bp)
 				enable_spread_spectrum_on_ppll_v3;
 		break;
 	default:
-		dm_output_to_console("Don't have enable_spread_spectrum_on_ppll for v%d\n",
-			 BIOS_CMD_TABLE_PARA_REVISION(EnableSpreadSpectrumOnPPLL));
 		bp->cmd_tbl.enable_spread_spectrum_on_ppll = NULL;
 		break;
 	}
@@ -1447,8 +1422,6 @@ static void init_adjust_display_pll(struct bios_parser *bp)
 		bp->cmd_tbl.adjust_display_pll = adjust_display_pll_v3;
 		break;
 	default:
-		dm_output_to_console("Don't have adjust_display_pll for v%d\n",
-			 BIOS_CMD_TABLE_PARA_REVISION(AdjustDisplayPll));
 		bp->cmd_tbl.adjust_display_pll = NULL;
 		break;
 	}
@@ -1722,8 +1695,6 @@ static void init_set_crtc_timing(struct bios_parser *bp)
 					set_crtc_using_dtd_timing_v3;
 			break;
 		default:
-			dm_output_to_console("Don't have set_crtc_timing for dtd v%d\n",
-				 dtd_version);
 			bp->cmd_tbl.set_crtc_timing = NULL;
 			break;
 		}
@@ -1733,8 +1704,6 @@ static void init_set_crtc_timing(struct bios_parser *bp)
 			bp->cmd_tbl.set_crtc_timing = set_crtc_timing_v1;
 			break;
 		default:
-			dm_output_to_console("Don't have set_crtc_timing for v%d\n",
-				 BIOS_CMD_TABLE_PARA_REVISION(SetCRTC_Timing));
 			bp->cmd_tbl.set_crtc_timing = NULL;
 			break;
 		}
@@ -1921,8 +1890,6 @@ static void init_select_crtc_source(struct bios_parser *bp)
 		bp->cmd_tbl.select_crtc_source = select_crtc_source_v3;
 		break;
 	default:
-		dm_output_to_console("Don't select_crtc_source enable_crtc for v%d\n",
-			 BIOS_CMD_TABLE_PARA_REVISION(SelectCRTC_Source));
 		bp->cmd_tbl.select_crtc_source = NULL;
 		break;
 	}
@@ -2030,8 +1997,6 @@ static void init_enable_crtc(struct bios_parser *bp)
 		bp->cmd_tbl.enable_crtc = enable_crtc_v1;
 		break;
 	default:
-		dm_output_to_console("Don't have enable_crtc for v%d\n",
-			 BIOS_CMD_TABLE_PARA_REVISION(EnableCRTC));
 		bp->cmd_tbl.enable_crtc = NULL;
 		break;
 	}
@@ -2138,8 +2103,6 @@ static void init_program_clock(struct bios_parser *bp)
 		bp->cmd_tbl.program_clock = program_clock_v6;
 		break;
 	default:
-		dm_output_to_console("Don't have program_clock for v%d\n",
-			 BIOS_CMD_TABLE_PARA_REVISION(SetPixelClock));
 		bp->cmd_tbl.program_clock = NULL;
 		break;
 	}
@@ -2200,9 +2163,6 @@ static enum bp_result program_clock_v6(
 
 	if (bp_params->flags.SET_EXTERNAL_REF_DIV_SRC)
 		params.sPCLKInput.ucMiscInfo |= PIXEL_CLOCK_MISC_REF_DIV_SRC;
-
-	if (bp_params->flags.SET_DISPCLK_DFS_BYPASS)
-		params.sPCLKInput.ucMiscInfo |= PIXEL_CLOCK_V6_MISC_DPREFCLK_BYPASS;
 
 	if (EXEC_BIOS_CMD_TABLE(SetPixelClock, params)) {
 		/* True display clock is returned by VBIOS if DFS bypass
@@ -2364,8 +2324,6 @@ static void init_enable_disp_power_gating(
 				enable_disp_power_gating_v2_1;
 		break;
 	default:
-		dm_output_to_console("Don't enable_disp_power_gating enable_crtc for v%d\n",
-			 BIOS_CMD_TABLE_PARA_REVISION(EnableDispPowerGating));
 		bp->cmd_tbl.enable_disp_power_gating = NULL;
 		break;
 	}
@@ -2413,8 +2371,6 @@ static void init_set_dce_clock(struct bios_parser *bp)
 		bp->cmd_tbl.set_dce_clock = set_dce_clock_v2_1;
 		break;
 	default:
-		dm_output_to_console("Don't have set_dce_clock for v%d\n",
-			 BIOS_CMD_TABLE_PARA_REVISION(SetDCEClock));
 		bp->cmd_tbl.set_dce_clock = NULL;
 		break;
 	}

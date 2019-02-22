@@ -59,10 +59,10 @@ gp102_run_secure_scrub(struct nvkm_secboot *sb)
 
 	nvkm_debug(subdev, "running VPR scrubber binary on NVDEC...\n");
 
-	engine = nvkm_engine_ref(&device->nvdec[0]->engine);
+	engine = nvkm_engine_ref(&device->nvdec->engine);
 	if (IS_ERR(engine))
 		return PTR_ERR(engine);
-	falcon = device->nvdec[0]->falcon;
+	falcon = device->nvdec->falcon;
 
 	nvkm_falcon_get(falcon, &sb->subdev);
 
@@ -133,7 +133,7 @@ gp102_secboot_run_blob(struct nvkm_secboot *sb, struct nvkm_gpuobj *blob,
 	return gm200_secboot_run_blob(sb, blob, falcon);
 }
 
-const struct nvkm_secboot_func
+static const struct nvkm_secboot_func
 gp102_secboot = {
 	.dtor = gm200_secboot_dtor,
 	.oneinit = gm200_secboot_oneinit,
