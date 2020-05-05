@@ -1,8 +1,0 @@
---- a/drivers/gpu/drm/scheduler/Makefile
-+++ b/drivers/gpu/drm/scheduler/Makefile
-@@ -22,4 +22,4 @@
- #
- gpu-sched-y := sched_main.o sched_fence.o sched_entity.o
- 
--obj-$(CONFIG_DRM_SCHED) += gpu-sched.o
-+obj-m += gpu-sched.o

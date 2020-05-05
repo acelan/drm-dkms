@@ -20,6 +20,8 @@
 #include <drm/drm_auth.h>
 #include <drm/drm_crtc_helper.h>
 
+extern struct file *filp_clone_open(struct file *);
+
 #define drm_for_each_lessee(lessee, lessor) \
 	list_for_each_entry((lessee), &(lessor)->lessees, lessee_list)
 

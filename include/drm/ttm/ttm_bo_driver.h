@@ -45,6 +45,8 @@
 
 #include <backport.h>
 
+#include <backport.h>
+
 #define TTM_MAX_BO_PRIORITY	4U
 
 struct ttm_backend_func {

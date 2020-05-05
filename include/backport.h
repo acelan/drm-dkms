@@ -1,3 +1,5 @@
+#ifndef __BACKPORT_H__
+#define __BACKPORT_H__
 
 static inline int
 reservation_object_lock_interruptible(struct reservation_object *obj,
@@ -12,3 +14,4 @@ int bpo_reservation_object_get_fences_rcu(struct reservation_object *obj,
                                       struct dma_fence ***pshared);
 
 
+#endif
